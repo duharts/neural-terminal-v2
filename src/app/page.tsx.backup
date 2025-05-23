@@ -1,0 +1,269 @@
+﻿'use client';
+
+import { useState, useRef, useEffect } from 'react';
+import { Mic, MicOff, Send, Terminal, Cpu, Zap } from 'lucide-react';
+
+interface Message {
+  id: string;
+  type: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: Date;
+}
+
+export default function NeuralTerminal() {
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: '1',
+      type: 'system',
+      content: 'NEURAL TERMINAL v2.1.0 INITIALIZED\nAdvanced AI Voice Interface Ready\nType "help" for available commands',
+      timestamp: new Date()
+    }
+  ]);
+  const [input, setInput] = useState('');
+  const [isListening, setIsListening] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const terminalRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (terminalRef.current) {
+      terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  // Focus input on mount
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, []);
+
+  const addMessage = (type: 'user' | 'assistant' | 'system', content: string) => {
+    const newMessage: Message = {
+      id: Date.now().toString(),
+      type,
+      content,
+      timestamp: new Date()
+    };
+    setMessages(prev => [...prev, newMessage]);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
+
+    const userInput = input.trim();
+    setInput('');
+    addMessage('user', userInput);
+    setIsLoading(true);
+
+    try {
+      // Handle built-in commands
+      if (userInput.toLowerCase() === 'help') {
+        addMessage('system', 'Available commands:\n• help - Show this help message\n• clear - Clear terminal\n• status - System diagnostics\n• history - Show conversation history\n\nOr ask any question to the AI!');
+        setIsLoading(false);
+        return;
+      }
+
+      if (userInput.toLowerCase() === 'clear') {
+        setMessages([{
+          id: Date.now().toString(),
+          type: 'system',
+          content: 'NEURAL TERMINAL v2.1.0 INITIALIZED\nAdvanced AI Voice Interface Ready\nType "help" for available commands',
+          timestamp: new Date()
+        }]);
+        setIsLoading(false);
+        return;
+      }
+
+      if (userInput.toLowerCase() === 'status') {
+        addMessage('system', `SYSTEM STATUS:\n• Neural Network: ONLINE\n• Voice Recognition: ${navigator.mediaDevices ? 'AVAILABLE' : 'UNAVAILABLE'}\n• API Connection: ACTIVE\n• Memory Usage: ${messages.length} messages\n• Timestamp: ${new Date().toISOString()}`);
+        setIsLoading(false);
+        return;
+      }
+
+      // Call AI API
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userInput })
+      });
+
+      if (!response.ok) throw new Error('API request failed');
+
+      const data = await response.json();
+      addMessage('assistant', data.response);
+    } catch (error) {
+      addMessage('system', `ERROR: ${error instanceof Error ? error.message : 'Unknown error occurred'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const toggleVoiceRecognition = async () => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      addMessage('system', 'ERROR: Voice recognition not supported in this browser');
+      return;
+    }
+
+    if (isListening) {
+      setIsListening(false);
+      addMessage('system', 'Voice recognition stopped');
+      return;
+    }
+
+    try {
+      setIsListening(true);
+      addMessage('system', 'Voice recognition started... Speak now');
+      
+      // Simulate voice recognition (replace with actual implementation)
+      setTimeout(() => {
+        setIsListening(false);
+        addMessage('system', 'Voice recognition feature coming soon! Please use text input for now.');
+      }, 3000);
+    } catch (error) {
+      setIsListening(false);
+      addMessage('system', `Voice recognition error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const formatTimestamp = (date: Date) => {
+    return date.toLocaleTimeString('en-US', { 
+      hour12: false, 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      second: '2-digit' 
+    });
+  };
+
+  const getMessagePrefix = (type: Message['type']) => {
+    switch (type) {
+      case 'user': return '[USER]';
+      case 'assistant': return '[NEURAL-AI]';
+      case 'system': return '[SYSTEM]';
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-black text-terminal-green font-mono p-4">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-6 p-4 border border-terminal-green-border rounded-lg bg-terminal-black-light">
+          <div className="flex items-center gap-2">
+            <Terminal className="w-6 h-6 text-terminal-green" />
+            <Cpu className="w-5 h-5 text-terminal-green animate-pulse" />
+            <Zap className="w-4 h-4 text-terminal-green" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-terminal-green">NEURAL TERMINAL</h1>
+            <p className="text-sm text-terminal-green-dim">Advanced AI Voice Interface v2.1.0</p>
+          </div>
+        </div>
+
+        {/* Terminal Output */}
+        <div 
+          ref={terminalRef}
+          className="h-96 overflow-y-auto bg-terminal-black border border-terminal-green-border rounded-lg p-4 mb-4 scrollbar-thin scrollbar-track-terminal-black scrollbar-thumb-terminal-green"
+          style={{
+            boxShadow: '0 0 20px rgba(0, 255, 65, 0.3)',
+            background: 'linear-gradient(145deg, #000000, #0a0a0a)'
+          }}
+        >
+          {messages.map((message) => (
+            <div key={message.id} className="mb-2">
+              <div className="flex items-start gap-2 text-xs text-terminal-green-dim mb-1">
+                <span>[{formatTimestamp(message.timestamp)}]</span>
+                <span className={`font-bold ${
+                  message.type === 'user' ? 'text-blue-400' : 
+                  message.type === 'assistant' ? 'text-terminal-green' : 
+                  'text-yellow-400'
+                }`}>
+                  {getMessagePrefix(message.type)}
+                </span>
+              </div>
+              <div className={`pl-4 whitespace-pre-wrap ${
+                message.type === 'user' ? 'text-blue-300' : 
+                message.type === 'assistant' ? 'text-terminal-green' : 
+                'text-yellow-300'
+              }`}>
+                {message.content}
+              </div>
+            </div>
+          ))}
+          {isLoading && (
+            <div className="flex items-center gap-2 text-terminal-green-dim animate-pulse">
+              <span>[PROCESSING]</span>
+              <div className="flex gap-1">
+                <div className="w-1 h-1 bg-terminal-green rounded-full animate-bounce"></div>
+                <div className="w-1 h-1 bg-terminal-green rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                <div className="w-1 h-1 bg-terminal-green rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Voice Activation Button - Now positioned directly under terminal */}
+        <div className="flex justify-center mb-4">
+          <button
+            onClick={toggleVoiceRecognition}
+            disabled={isLoading}
+            className={`p-4 rounded-full border-2 transition-all duration-300 ${
+              isListening 
+                ? 'border-red-500 bg-red-500/20 text-red-400 shadow-lg shadow-red-500/50' 
+                : 'border-terminal-green bg-terminal-green/10 text-terminal-green hover:bg-terminal-green/20 hover:shadow-lg hover:shadow-terminal-green/50'
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
+            style={{
+              boxShadow: isListening 
+                ? '0 0 30px rgba(239, 68, 68, 0.6)' 
+                : '0 0 20px rgba(0, 255, 65, 0.4)'
+            }}
+          >
+            {isListening ? (
+              <MicOff className="w-8 h-8 animate-pulse" />
+            ) : (
+              <Mic className="w-8 h-8" />
+            )}
+          </button>
+        </div>
+
+        {/* Input Form */}
+        <form onSubmit={handleSubmit} className="flex gap-2">
+          <div className="flex-1 relative">
+            <input
+              ref={inputRef}
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              disabled={isLoading}
+              placeholder="Enter command or ask AI anything..."
+              className="w-full bg-terminal-black border border-terminal-green-border rounded px-4 py-3 text-terminal-green placeholder-terminal-green-dim focus:outline-none focus:border-terminal-green focus:shadow-lg focus:shadow-terminal-green/30 disabled:opacity-50"
+              style={{
+                background: 'linear-gradient(145deg, #000000, #0a0a0a)',
+              }}
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={!input.trim() || isLoading}
+            className="px-6 py-3 bg-terminal-green/10 border border-terminal-green-border rounded text-terminal-green hover:bg-terminal-green/20 hover:shadow-lg hover:shadow-terminal-green/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+          >
+            <Send className="w-5 h-5" />
+          </button>
+        </form>
+
+        {/* Status Bar */}
+        <div className="mt-4 flex justify-between items-center text-xs text-terminal-green-dim">
+          <div className="flex items-center gap-4">
+            <span>STATUS: {isListening ? 'LISTENING' : isLoading ? 'PROCESSING' : 'READY'}</span>
+            <span>MESSAGES: {messages.length}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 bg-terminal-green rounded-full animate-pulse"></div>
+            <span>NEURAL LINK ACTIVE</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

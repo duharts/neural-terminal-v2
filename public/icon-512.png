@@ -1,0 +1,9 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" fill="#000000" rx="50"/>
+  <rect x="50" y="50" width="412" height="412" fill="none" stroke="#00ff41" stroke-width="4" rx="25"/>
+  <circle cx="256" cy="200" r="80" fill="none" stroke="#00ff41" stroke-width="3" opacity="0.3"/>
+  <text x="256" y="290" font-family="monospace" font-size="120" fill="#00ff41" text-anchor="middle">🧠</text>
+  <text x="256" y="350" font-family="monospace" font-size="24" fill="#00ff41" text-anchor="middle" opacity="0.8">NEURAL TERMINAL</text>
+  <text x="256" y="380" font-family="monospace" font-size="16" fill="#00ff4180" text-anchor="middle">AI Voice Interface</text>
+</svg>

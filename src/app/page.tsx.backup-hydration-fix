@@ -1,0 +1,611 @@
+﻿'use client';
+
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { 
+  Mic, MicOff, Send, Terminal, Cpu, Zap, Settings, 
+  Volume2, VolumeX, RotateCcw, Trash2, Download,
+  Activity, Wifi, Shield, Database, Clock
+} from 'lucide-react';
+
+interface Message {
+  id: string;
+  type: 'user' | 'assistant' | 'system' | 'error';
+  content: string;
+  timestamp: Date;
+  model?: string;
+}
+
+interface AIConfig {
+  model: 'gpt-4' | 'gpt-3.5-turbo' | 'perplexity';
+  temperature: number;
+  maxTokens: number;
+  systemPrompt: string;
+}
+
+export default function NeuralTerminal() {
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: '1',
+      type: 'system',
+      content: `
+╔══════════════════════════════════════════════════════════════╗
+║                    NEURAL TERMINAL v2.1.0                   ║
+║                Advanced AI Voice Interface                   ║
+╠══════════════════════════════════════════════════════════════╣
+║ STATUS: ONLINE  │  NEURAL LINK: ACTIVE  │  VOICE: READY     ║
+║ AI MODELS: GPT-4, GPT-3.5, PERPLEXITY   │  MEMORY: ACTIVE   ║
+╚══════════════════════════════════════════════════════════════╝
+
+🎤 Voice commands available - Click microphone to activate
+💬 Type "help" for available commands
+🧠 Multiple AI models ready for complex queries
+⚡ Real-time processing with advanced neural networks
+      `,
+      timestamp: new Date()
+    }
+  ]);
+
+  const [input, setInput] = useState('');
+  const [isListening, setIsListening] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [audioLevel, setAudioLevel] = useState(0);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  
+  const [config, setConfig] = useState<AIConfig>({
+    model: 'gpt-4',
+    temperature: 0.7,
+    maxTokens: 2000,
+    systemPrompt: 'You are NEURAL-AI, an advanced AI assistant in a cyberpunk terminal. Respond professionally but with a slight technical/futuristic tone. Be helpful, intelligent, and concise.'
+  });
+
+  const terminalRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recognitionRef = useRef<any>(null);
+  const synthRef = useRef<SpeechSynthesis | null>(null);
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (terminalRef.current) {
+      terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  // Focus input on mount and setup speech synthesis
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+    if (typeof window !== 'undefined') {
+      synthRef.current = window.speechSynthesis;
+    }
+  }, []);
+
+  // Initialize speech recognition
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'webkitSpeechRecognition' in window) {
+      const SpeechRecognition = (window as any).webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = false;
+      recognitionRef.current.lang = 'en-US';
+
+      recognitionRef.current.onstart = () => {
+        setIsListening(true);
+        addMessage('system', '🎤 Voice recognition activated - Listening...');
+      };
+
+      recognitionRef.current.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setInput(transcript);
+        addMessage('user', transcript);
+        handleAIQuery(transcript);
+      };
+
+      recognitionRef.current.onerror = (event: any) => {
+        addMessage('error', `Voice recognition error: ${event.error}`);
+        setIsListening(false);
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsListening(false);
+      };
+    }
+  }, []);
+
+  const addMessage = useCallback((type: Message['type'], content: string, model?: string) => {
+    const newMessage: Message = {
+      id: Date.now().toString() + Math.random(),
+      type,
+      content,
+      timestamp: new Date(),
+      model
+    };
+    setMessages(prev => [...prev, newMessage]);
+  }, []);
+
+  const handleAIQuery = async (query: string) => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          message: query,
+          config: config
+        })
+      });
+
+      if (!response.ok) throw new Error(`API Error: ${response.status}`);
+
+      const data = await response.json();
+      addMessage('assistant', data.response, config.model);
+      
+      // Optional text-to-speech
+      if (synthRef.current && data.response.length < 500) {
+        speakResponse(data.response);
+      }
+    } catch (error) {
+      addMessage('error', `❌ API Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const speakResponse = (text: string) => {
+    if (!synthRef.current) return;
+    
+    setIsSpeaking(true);
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+    utterance.volume = 0.8;
+    
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    
+    synthRef.current.speak(utterance);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
+
+    const userInput = input.trim();
+    setInput('');
+    addMessage('user', userInput);
+
+    // Handle built-in commands
+    if (userInput.toLowerCase().startsWith('/')) {
+      handleSystemCommand(userInput);
+      return;
+    }
+
+    await handleAIQuery(userInput);
+  };
+
+  const handleSystemCommand = (command: string) => {
+    const cmd = command.toLowerCase();
+    
+    switch (cmd) {
+      case '/help':
+        addMessage('system', `
+🔧 NEURAL TERMINAL COMMANDS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+/help          - Show this help message
+/clear         - Clear terminal history
+/status        - System diagnostics
+/history       - Export conversation history
+/settings      - Open configuration panel
+/models        - List available AI models
+/voice on/off  - Toggle voice synthesis
+/reset         - Reset to default settings
+
+💡 AI QUERIES:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Simply type any question or use voice input!
+Examples: "Explain quantum computing", "Write Python code", etc.
+        `);
+        break;
+        
+      case '/clear':
+        setMessages([{
+          id: Date.now().toString(),
+          type: 'system',
+          content: '🧹 Terminal cleared - Neural interface ready',
+          timestamp: new Date()
+        }]);
+        break;
+        
+      case '/status':
+        addMessage('system', `
+🔍 SYSTEM DIAGNOSTICS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🧠 Neural Network: ONLINE
+🎤 Voice Recognition: ${recognitionRef.current ? 'AVAILABLE' : 'UNAVAILABLE'}
+🔊 Speech Synthesis: ${synthRef.current ? 'READY' : 'UNAVAILABLE'}
+🤖 Current Model: ${config.model.toUpperCase()}
+🌡️ Temperature: ${config.temperature}
+📝 Max Tokens: ${config.maxTokens}
+💾 Messages in Memory: ${messages.length}
+⏰ Session Started: ${messages[0]?.timestamp.toLocaleString()}
+🔗 API Status: CONNECTED
+        `);
+        break;
+        
+      case '/models':
+        addMessage('system', `
+🤖 AVAILABLE AI MODELS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• GPT-4: Most capable, best for complex reasoning
+• GPT-3.5-TURBO: Fast and efficient for most tasks
+• PERPLEXITY: Real-time web search and current events
+
+Current: ${config.model.toUpperCase()}
+        `);
+        break;
+        
+      case '/voice on':
+        addMessage('system', '🔊 Voice synthesis enabled');
+        break;
+        
+      case '/voice off':
+        if (synthRef.current) {
+          synthRef.current.cancel();
+        }
+        setIsSpeaking(false);
+        addMessage('system', '🔇 Voice synthesis disabled');
+        break;
+        
+      case '/history':
+        downloadHistory();
+        break;
+        
+      case '/settings':
+        setShowSettings(true);
+        break;
+        
+      case '/reset':
+        setConfig({
+          model: 'gpt-4',
+          temperature: 0.7,
+          maxTokens: 2000,
+          systemPrompt: 'You are NEURAL-AI, an advanced AI assistant in a cyberpunk terminal.'
+        });
+        addMessage('system', '⚙️ Settings reset to defaults');
+        break;
+        
+      default:
+        addMessage('error', `❌ Unknown command: ${command}\nType /help for available commands`);
+    }
+  };
+
+  const toggleVoiceRecognition = async () => {
+    if (!recognitionRef.current) {
+      addMessage('error', '❌ Voice recognition not supported in this browser');
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      recognitionRef.current.start();
+    } catch (error) {
+      addMessage('error', `Voice recognition error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const downloadHistory = () => {
+    const historyText = messages.map(msg => 
+      `[${msg.timestamp.toLocaleString()}] ${msg.type.toUpperCase()}: ${msg.content}`
+    ).join('\n\n');
+    
+    const blob = new Blob([historyText], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `neural-terminal-history-${Date.now()}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    addMessage('system', '📥 Conversation history downloaded');
+  };
+
+  const formatTimestamp = (date: Date) => {
+    return date.toLocaleTimeString('en-US', { 
+      hour12: false, 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      second: '2-digit' 
+    });
+  };
+
+  const getMessagePrefix = (type: Message['type']) => {
+    switch (type) {
+      case 'user': return '👤 USER';
+      case 'assistant': return '🧠 NEURAL-AI';
+      case 'system': return '⚙️ SYSTEM';
+      case 'error': return '❌ ERROR';
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-black text-terminal-green font-mono">
+      {/* Animated background */}
+      <div className="fixed inset-0 opacity-10">
+        <div className="absolute inset-0" style={{
+          backgroundImage: `
+            radial-gradient(circle at 25% 25%, #00ff41 0%, transparent 50%),
+            radial-gradient(circle at 75% 75%, #00ff41 0%, transparent 50%)
+          `,
+          animation: 'pulse 4s ease-in-out infinite alternate'
+        }}></div>
+      </div>
+
+      <div className="relative z-10 p-4">
+        <div className="max-w-4xl mx-auto">
+          {/* Enhanced Header */}
+          <div className="mb-6 p-6 border border-terminal-green-border rounded-lg bg-terminal-black-light relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-terminal-green/5 to-transparent"></div>
+            <div className="relative flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Terminal className="w-8 h-8 text-terminal-green" />
+                  <Cpu className="w-6 h-6 text-terminal-green animate-pulse" />
+                  <Zap className="w-5 h-5 text-terminal-green animate-bounce" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-terminal-green">NEURAL TERMINAL</h1>
+                  <p className="text-terminal-green-dim">Advanced AI Voice Interface v2.1.0</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowSettings(!showSettings)}
+                  className="p-2 border border-terminal-green-border rounded hover:bg-terminal-green/10 transition-colors"
+                >
+                  <Settings className="w-5 h-5" />
+                </button>
+                <div className="flex items-center gap-2 text-sm">
+                  <Activity className="w-4 h-4 animate-pulse" />
+                  <span>{config.model.toUpperCase()}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Settings Panel */}
+          {showSettings && (
+            <div className="mb-6 p-4 border border-terminal-green-border rounded-lg bg-terminal-black-light">
+              <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                <Settings className="w-5 h-5" />
+                Configuration Panel
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold mb-2">AI Model</label>
+                  <select
+                    value={config.model}
+                    onChange={(e) => setConfig(prev => ({ ...prev, model: e.target.value as any }))}
+                    className="w-full bg-terminal-black border border-terminal-green-border rounded px-3 py-2 text-terminal-green"
+                  >
+                    <option value="gpt-4">GPT-4 (Most Capable)</option>
+                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Fast)</option>
+                    <option value="perplexity">Perplexity (Web Search)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold mb-2">Temperature: {config.temperature}</label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    value={config.temperature}
+                    onChange={(e) => setConfig(prev => ({ ...prev, temperature: parseFloat(e.target.value) }))}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold mb-2">Max Tokens</label>
+                  <input
+                    type="number"
+                    min="100"
+                    max="4000"
+                    value={config.maxTokens}
+                    onChange={(e) => setConfig(prev => ({ ...prev, maxTokens: parseInt(e.target.value) }))}
+                    className="w-full bg-terminal-black border border-terminal-green-border rounded px-3 py-2 text-terminal-green"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowSettings(false)}
+                    className="px-4 py-2 bg-terminal-green/20 border border-terminal-green rounded hover:bg-terminal-green/30 transition-colors"
+                  >
+                    Close
+                  </button>
+                  <button
+                    onClick={downloadHistory}
+                    className="px-4 py-2 border border-terminal-green-border rounded hover:bg-terminal-green/10 transition-colors flex items-center gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    Export
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Terminal Output */}
+          <div 
+            ref={terminalRef}
+            className="h-96 overflow-y-auto bg-terminal-black border border-terminal-green-border rounded-lg p-4 mb-4 scrollbar-thin scrollbar-track-terminal-black scrollbar-thumb-terminal-green relative"
+            style={{
+              boxShadow: '0 0 20px rgba(0, 255, 65, 0.3)',
+              background: 'linear-gradient(145deg, #000000, #0a0a0a)'
+            }}
+          >
+            {messages.map((message) => (
+              <div key={message.id} className="mb-4 group">
+                <div className="flex items-start gap-2 text-xs text-terminal-green-dim mb-1">
+                  <span>[{formatTimestamp(message.timestamp)}]</span>
+                  <span className={`font-bold ${
+                    message.type === 'user' ? 'text-blue-400' : 
+                    message.type === 'assistant' ? 'text-terminal-green' : 
+                    message.type === 'error' ? 'text-red-400' :
+                    'text-yellow-400'
+                  }`}>
+                    {getMessagePrefix(message.type)}
+                  </span>
+                  {message.model && (
+                    <span className="text-purple-400">({message.model})</span>
+                  )}
+                </div>
+                <div className={`pl-4 whitespace-pre-wrap leading-relaxed ${
+                  message.type === 'user' ? 'text-blue-300' : 
+                  message.type === 'assistant' ? 'text-terminal-green' : 
+                  message.type === 'error' ? 'text-red-300' :
+                  'text-yellow-300'
+                } group-hover:bg-terminal-green/5 rounded p-2 transition-colors`}>
+                  {message.content}
+                </div>
+              </div>
+            ))}
+            
+            {isLoading && (
+              <div className="flex items-center gap-2 text-terminal-green animate-pulse p-2">
+                <Cpu className="w-4 h-4 animate-spin" />
+                <span>[NEURAL-AI PROCESSING]</span>
+                <div className="flex gap-1">
+                  <div className="w-1 h-1 bg-terminal-green rounded-full animate-bounce"></div>
+                  <div className="w-1 h-1 bg-terminal-green rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                  <div className="w-1 h-1 bg-terminal-green rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Voice Activation Button - Positioned under terminal */}
+          <div className="flex justify-center mb-4">
+            <button
+              onClick={toggleVoiceRecognition}
+              disabled={isLoading}
+              className={`relative p-6 rounded-full border-2 transition-all duration-300 group ${
+                isListening 
+                  ? 'border-red-500 bg-red-500/20 text-red-400 animate-pulse' 
+                  : 'border-terminal-green bg-terminal-green/10 text-terminal-green hover:bg-terminal-green/20 hover:scale-110'
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
+              style={{
+                boxShadow: isListening 
+                  ? '0 0 40px rgba(239, 68, 68, 0.8)' 
+                  : '0 0 30px rgba(0, 255, 65, 0.5)'
+              }}
+            >
+              {isListening ? (
+                <MicOff className="w-10 h-10" />
+              ) : (
+                <Mic className="w-10 h-10" />
+              )}
+              
+              {/* Voice level indicator */}
+              {isListening && (
+                <div className="absolute inset-0 rounded-full border-2 border-red-400 animate-ping"></div>
+              )}
+              
+              {/* Tooltip */}
+              <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 px-3 py-1 bg-terminal-black border border-terminal-green-border rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                {isListening ? 'Stop Listening' : 'Start Voice Input'}
+              </div>
+            </button>
+          </div>
+
+          {/* Input Form */}
+          <form onSubmit={handleSubmit} className="flex gap-2 mb-4">
+            <div className="flex-1 relative">
+              <input
+                ref={inputRef}
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                disabled={isLoading}
+                placeholder="Enter command (/help for commands) or ask AI anything..."
+                className="w-full bg-terminal-black border border-terminal-green-border rounded px-4 py-3 text-terminal-green placeholder-terminal-green-dim focus:outline-none focus:border-terminal-green focus:shadow-lg focus:shadow-terminal-green/30 disabled:opacity-50 pr-12"
+                style={{
+                  background: 'linear-gradient(145deg, #000000, #0a0a0a)',
+                }}
+              />
+              {isSpeaking && (
+                <Volume2 className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-terminal-green animate-pulse" />
+              )}
+            </div>
+            <button
+              type="submit"
+              disabled={!input.trim() || isLoading}
+              className="px-6 py-3 bg-terminal-green/10 border border-terminal-green-border rounded text-terminal-green hover:bg-terminal-green/20 hover:shadow-lg hover:shadow-terminal-green/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center gap-2"
+            >
+              <Send className="w-5 h-5" />
+            </button>
+          </form>
+
+          {/* Enhanced Status Bar */}
+          <div className="flex justify-between items-center text-xs text-terminal-green-dim bg-terminal-black-light p-3 rounded border border-terminal-green-border">
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${
+                  isListening ? 'bg-red-400 animate-pulse' : 
+                  isLoading ? 'bg-yellow-400 animate-bounce' : 
+                  'bg-terminal-green animate-pulse'
+                }`}></div>
+                <span>STATUS: {
+                  isListening ? 'LISTENING' : 
+                  isLoading ? 'PROCESSING' : 
+                  'READY'
+                }</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Database className="w-3 h-3" />
+                <span>MESSAGES: {messages.length}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Cpu className="w-3 h-3" />
+                <span>MODEL: {config.model.toUpperCase()}</span>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              {isSpeaking && (
+                <div className="flex items-center gap-2 text-terminal-green">
+                  <Volume2 className="w-3 h-3 animate-pulse" />
+                  <span>SPEAKING</span>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <Wifi className="w-3 h-3" />
+                <span>NEURAL LINK ACTIVE</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Clock className="w-3 h-3" />
+                <span>{new Date().toLocaleTimeString()}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <style jsx>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 0.1; }
+          50% { opacity: 0.2; }
+        }
+      `}</style>
+    </div>
+  );
+}
