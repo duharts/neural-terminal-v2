@@ -216,11 +216,6 @@ export default function HomePage() {
           setVoiceState(prev => ({ ...prev, isListening: false }))
         }
       }
-
-      // Check for media recording support
-      if (navigator.mediaDevices?.getUserMedia) {
-        setVoiceState(prev => ({ ...prev, isSupported: true }))
-      }
     }
   }, [])
 
@@ -441,20 +436,20 @@ export default function HomePage() {
         content: `NEURAL TERMINAL v2.1 - Command Reference:
 
 CHAT COMMANDS:
-Ã¢â‚¬Â¢ Type any message to chat with the selected AI model
-Ã¢â‚¬Â¢ Use voice input with microphone for hands-free interaction
+ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ Type any message to chat with the selected AI model
+ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ Use voice input with microphone for hands-free interaction
 
 SYSTEM COMMANDS:
-Ã¢â‚¬Â¢ help - Show this command reference
-Ã¢â‚¬Â¢ status - Display detailed system status
-Ã¢â‚¬Â¢ clear - Clear terminal history
-Ã¢â‚¬Â¢ settings - Open/close MCP settings panel
-Ã¢â‚¬Â¢ apikeys - Open/close API key management
+ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ help - Show this command reference
+ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ status - Display detailed system status
+ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ clear - Clear terminal history
+ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ settings - Open/close MCP settings panel
+ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ apikeys - Open/close API key management
 
 VOICE COMMANDS:
-Ã¢â‚¬Â¢ Click microphone to record audio
-Ã¢â‚¬Â¢ Audio is transcribed via Whisper API
-Ã¢â‚¬Â¢ Transcription is sent to selected LLM
+ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ Click microphone to record audio
+ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ Audio is transcribed via Whisper API
+ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ Transcription is sent to selected LLM
 
 Current Model: ${AI_MODELS.find(m => m.id === mcpSettings.selectedModel)?.name}
 Temperature: ${mcpSettings.temperature} (Creativity: ${Math.round(mcpSettings.temperature * 100)}%)`,
@@ -470,15 +465,15 @@ Temperature: ${mcpSettings.temperature} (Creativity: ${Math.round(mcpSettings.te
       return {
         type: 'system' as const,
         content: `NEURAL TERMINAL SYSTEM STATUS
-Ã¢â€¢â€Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢â€”
-Ã¢â€¢â€˜            SYSTEM OVERVIEW            Ã¢â€¢â€˜
-Ã¢â€¢Â Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â£
-Ã¢â€¢â€˜ Status: ONLINE                        Ã¢â€¢â€˜
-Ã¢â€¢â€˜ LLM Integration: ACTIVE               Ã¢â€¢â€˜
-Ã¢â€¢â€˜ Whisper Transcription: ${hasOpenAI ? 'READY' : 'NO API KEY'}        Ã¢â€¢â€˜
-Ã¢â€¢â€˜ Voice Recognition: ${voiceState.isSupported ? 'ENABLED' : 'DISABLED'}           Ã¢â€¢â€˜
-Ã¢â€¢â€˜ MCP: OPERATIONAL                      Ã¢â€¢â€˜
-Ã¢â€¢Å¡Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+ÃƒÂ¢Ã¢â‚¬Â¢Ã¢â‚¬ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã¢â‚¬â€
+ÃƒÂ¢Ã¢â‚¬Â¢Ã¢â‚¬Ëœ            SYSTEM OVERVIEW            ÃƒÂ¢Ã¢â‚¬Â¢Ã¢â‚¬Ëœ
+ÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â£
+ÃƒÂ¢Ã¢â‚¬Â¢Ã¢â‚¬Ëœ Status: ONLINE                        ÃƒÂ¢Ã¢â‚¬Â¢Ã¢â‚¬Ëœ
+ÃƒÂ¢Ã¢â‚¬Â¢Ã¢â‚¬Ëœ LLM Integration: ACTIVE               ÃƒÂ¢Ã¢â‚¬Â¢Ã¢â‚¬Ëœ
+ÃƒÂ¢Ã¢â‚¬Â¢Ã¢â‚¬Ëœ Whisper Transcription: ${hasOpenAI ? 'READY' : 'NO API KEY'}        ÃƒÂ¢Ã¢â‚¬Â¢Ã¢â‚¬Ëœ
+ÃƒÂ¢Ã¢â‚¬Â¢Ã¢â‚¬Ëœ Voice Recognition: ${voiceState.isSupported ? 'ENABLED' : 'DISABLED'}           ÃƒÂ¢Ã¢â‚¬Â¢Ã¢â‚¬Ëœ
+ÃƒÂ¢Ã¢â‚¬Â¢Ã¢â‚¬Ëœ MCP: OPERATIONAL                      ÃƒÂ¢Ã¢â‚¬Â¢Ã¢â‚¬Ëœ
+ÃƒÂ¢Ã¢â‚¬Â¢Ã…Â¡ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â
 
 SYSTEM RESOURCES:
 CPU Usage: ${systemStats.cpu}%
@@ -492,8 +487,8 @@ Temperature: ${mcpSettings.temperature}
 Max Tokens: ${mcpSettings.maxTokens}
 
 API KEYS STATUS:
-OpenAI: ${hasOpenAI ? 'Ã¢Å“â€¦ CONFIGURED' : 'Ã¢ÂÅ’ MISSING'}
-Anthropic: ${hasAnthropic ? 'Ã¢Å“â€¦ CONFIGURED' : 'Ã¢ÂÅ’ MISSING'}
+OpenAI: ${hasOpenAI ? 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ CONFIGURED' : 'ÃƒÂ¢Ã‚ÂÃ…â€™ MISSING'}
+Anthropic: ${hasAnthropic ? 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ CONFIGURED' : 'ÃƒÂ¢Ã‚ÂÃ…â€™ MISSING'}
 
 VOICE FEATURES:
 Browser Support: ${voiceState.isSupported ? 'YES' : 'NO'}
@@ -651,7 +646,7 @@ Last Confidence: ${Math.round(voiceState.confidence * 100)}%`,
                 <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
                 <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
                 <span className="text-cyan-400 font-mono text-sm ml-4">
-                  NEURAL TERMINAL v2.1 Ã¢â‚¬Â¢ LLM ACTIVE
+                  NEURAL TERMINAL v2.1 ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ LLM ACTIVE
                 </span>
               </div>
               <div className="flex items-center gap-4">
@@ -719,7 +714,7 @@ Last Confidence: ${Math.round(voiceState.confidence * 100)}%`,
             <div className="border-t border-cyan-400 p-4 flex-shrink-0">
               <form onSubmit={handleCommand} className="flex items-center gap-2">
                 <div className="flex items-center gap-1 text-xs">
-                  <span className="text-cyan-400">Ã¢Å¾Å“</span>
+                  <span className="text-cyan-400">ÃƒÂ¢Ã…Â¾Ã…â€œ</span>
                   <span className="text-green-400">neural</span>
                   <span className="text-gray-400">$</span>
                 </div>
@@ -768,13 +763,13 @@ Last Confidence: ${Math.round(voiceState.confidence * 100)}%`,
               
               {voiceState.isRecording && (
                 <div className="mt-2 text-xs text-red-400 animate-pulse">
-                  Ã°Å¸Å½â„¢Ã¯Â¸Â Recording audio for Whisper transcription...
+                  ÃƒÂ°Ã…Â¸Ã…Â½Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¸Ã‚Â Recording audio for Whisper transcription...
                 </div>
               )}
               
               {voiceState.error && (
                 <div className="mt-2 text-xs text-red-400">
-                  Ã¢Å¡Â Ã¯Â¸Â {voiceState.error}
+                  ÃƒÂ¢Ã…Â¡Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â {voiceState.error}
                 </div>
               )}
             </div>
@@ -832,13 +827,13 @@ Last Confidence: ${Math.round(voiceState.confidence * 100)}%`,
               
               <div className="flex justify-between">
                 <span className="text-gray-400">LLM:</span>
-                <span className="text-green-400 animate-pulse">Ã¢â€”Â ACTIVE</span>
+                <span className="text-green-400 animate-pulse">ÃƒÂ¢Ã¢â‚¬â€Ã‚Â ACTIVE</span>
               </div>
               
               <div className="flex justify-between">
                 <span className="text-gray-400">Whisper:</span>
                 <span className={`animate-pulse ${apiKeys.openai ? 'text-green-400' : 'text-red-400'}`}>
-                  Ã¢â€”Â {apiKeys.openai ? 'READY' : 'NO KEY'}
+                  ÃƒÂ¢Ã¢â‚¬â€Ã‚Â {apiKeys.openai ? 'READY' : 'NO KEY'}
                 </span>
               </div>
             </div>
