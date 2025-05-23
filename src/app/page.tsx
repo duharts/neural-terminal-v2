@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useRef } from 'react'
 import { Mic, MicOff, Settings, Brain, Key, ChevronUp, Send, Loader } from 'lucide-react'
