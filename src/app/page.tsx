@@ -218,7 +218,7 @@ export default function HomePage() {
       }
 
       // Check for media recording support
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      if (navigator.mediaDevices?.getUserMedia) {
         setVoiceState(prev => ({ ...prev, isSupported: true }))
       }
     }
@@ -441,20 +441,20 @@ export default function HomePage() {
         content: `NEURAL TERMINAL v2.1 - Command Reference:
 
 CHAT COMMANDS:
-• Type any message to chat with the selected AI model
-• Use voice input with microphone for hands-free interaction
+â€¢ Type any message to chat with the selected AI model
+â€¢ Use voice input with microphone for hands-free interaction
 
 SYSTEM COMMANDS:
-• help - Show this command reference
-• status - Display detailed system status
-• clear - Clear terminal history
-• settings - Open/close MCP settings panel
-• apikeys - Open/close API key management
+â€¢ help - Show this command reference
+â€¢ status - Display detailed system status
+â€¢ clear - Clear terminal history
+â€¢ settings - Open/close MCP settings panel
+â€¢ apikeys - Open/close API key management
 
 VOICE COMMANDS:
-• Click microphone to record audio
-• Audio is transcribed via Whisper API
-• Transcription is sent to selected LLM
+â€¢ Click microphone to record audio
+â€¢ Audio is transcribed via Whisper API
+â€¢ Transcription is sent to selected LLM
 
 Current Model: ${AI_MODELS.find(m => m.id === mcpSettings.selectedModel)?.name}
 Temperature: ${mcpSettings.temperature} (Creativity: ${Math.round(mcpSettings.temperature * 100)}%)`,
@@ -470,15 +470,15 @@ Temperature: ${mcpSettings.temperature} (Creativity: ${Math.round(mcpSettings.te
       return {
         type: 'system' as const,
         content: `NEURAL TERMINAL SYSTEM STATUS
-╔═══════════════════════════════════════╗
-║            SYSTEM OVERVIEW            ║
-╠═══════════════════════════════════════╣
-║ Status: ONLINE                        ║
-║ LLM Integration: ACTIVE               ║
-║ Whisper Transcription: ${hasOpenAI ? 'READY' : 'NO API KEY'}        ║
-║ Voice Recognition: ${voiceState.isSupported ? 'ENABLED' : 'DISABLED'}           ║
-║ MCP: OPERATIONAL                      ║
-╚═══════════════════════════════════════╝
+â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
+â•‘            SYSTEM OVERVIEW            â•‘
+â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£
+â•‘ Status: ONLINE                        â•‘
+â•‘ LLM Integration: ACTIVE               â•‘
+â•‘ Whisper Transcription: ${hasOpenAI ? 'READY' : 'NO API KEY'}        â•‘
+â•‘ Voice Recognition: ${voiceState.isSupported ? 'ENABLED' : 'DISABLED'}           â•‘
+â•‘ MCP: OPERATIONAL                      â•‘
+â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 SYSTEM RESOURCES:
 CPU Usage: ${systemStats.cpu}%
@@ -492,8 +492,8 @@ Temperature: ${mcpSettings.temperature}
 Max Tokens: ${mcpSettings.maxTokens}
 
 API KEYS STATUS:
-OpenAI: ${hasOpenAI ? '✅ CONFIGURED' : '❌ MISSING'}
-Anthropic: ${hasAnthropic ? '✅ CONFIGURED' : '❌ MISSING'}
+OpenAI: ${hasOpenAI ? 'âœ… CONFIGURED' : 'âŒ MISSING'}
+Anthropic: ${hasAnthropic ? 'âœ… CONFIGURED' : 'âŒ MISSING'}
 
 VOICE FEATURES:
 Browser Support: ${voiceState.isSupported ? 'YES' : 'NO'}
@@ -651,7 +651,7 @@ Last Confidence: ${Math.round(voiceState.confidence * 100)}%`,
                 <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
                 <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
                 <span className="text-cyan-400 font-mono text-sm ml-4">
-                  NEURAL TERMINAL v2.1 • LLM ACTIVE
+                  NEURAL TERMINAL v2.1 â€¢ LLM ACTIVE
                 </span>
               </div>
               <div className="flex items-center gap-4">
@@ -719,7 +719,7 @@ Last Confidence: ${Math.round(voiceState.confidence * 100)}%`,
             <div className="border-t border-cyan-400 p-4 flex-shrink-0">
               <form onSubmit={handleCommand} className="flex items-center gap-2">
                 <div className="flex items-center gap-1 text-xs">
-                  <span className="text-cyan-400">➜</span>
+                  <span className="text-cyan-400">âžœ</span>
                   <span className="text-green-400">neural</span>
                   <span className="text-gray-400">$</span>
                 </div>
@@ -768,13 +768,13 @@ Last Confidence: ${Math.round(voiceState.confidence * 100)}%`,
               
               {voiceState.isRecording && (
                 <div className="mt-2 text-xs text-red-400 animate-pulse">
-                  🎙️ Recording audio for Whisper transcription...
+                  ðŸŽ™ï¸ Recording audio for Whisper transcription...
                 </div>
               )}
               
               {voiceState.error && (
                 <div className="mt-2 text-xs text-red-400">
-                  ⚠️ {voiceState.error}
+                  âš ï¸ {voiceState.error}
                 </div>
               )}
             </div>
@@ -832,13 +832,13 @@ Last Confidence: ${Math.round(voiceState.confidence * 100)}%`,
               
               <div className="flex justify-between">
                 <span className="text-gray-400">LLM:</span>
-                <span className="text-green-400 animate-pulse">● ACTIVE</span>
+                <span className="text-green-400 animate-pulse">â— ACTIVE</span>
               </div>
               
               <div className="flex justify-between">
                 <span className="text-gray-400">Whisper:</span>
                 <span className={`animate-pulse ${apiKeys.openai ? 'text-green-400' : 'text-red-400'}`}>
-                  ● {apiKeys.openai ? 'READY' : 'NO KEY'}
+                  â— {apiKeys.openai ? 'READY' : 'NO KEY'}
                 </span>
               </div>
             </div>
