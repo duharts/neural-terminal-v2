@@ -1,35 +1,46 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Mic, MicOff, Settings, Brain, Cpu, Zap, ChevronDown, ChevronUp } from 'lucide-react'
+import { Mic, MicOff, Settings, Brain, Key, ChevronUp, Send, Loader } from 'lucide-react'
 
 interface TerminalMessage {
-  type: 'user' | 'system' | 'ai' | 'error' | 'success' | 'voice'
+  type: 'user' | 'system' | 'ai' | 'error' | 'success' | 'voice' | 'whisper'
   content: string
   timestamp: Date
   metadata?: {
     model?: string
     confidence?: number
     tokens?: number
+    audioUrl?: string
   }
 }
 
 interface VoiceState {
   isListening: boolean
+  isRecording: boolean
+  isProcessing: boolean
   isSupported: boolean
   transcript: string
   confidence: number
   error?: string
+  audioBlob?: Blob
 }
 
 interface AIModel {
   id: string
   name: string
   provider: string
+  apiEndpoint: string
   maxTokens: number
   temperature: number
-  topP: number
   description: string
+}
+
+interface APIKeys {
+  openai: string
+  anthropic: string
+  google: string
+  whisper: string
 }
 
 const AI_MODELS: AIModel[] = [
@@ -37,37 +48,37 @@ const AI_MODELS: AIModel[] = [
     id: 'gpt-4-turbo',
     name: 'GPT-4 Turbo',
     provider: 'OpenAI',
+    apiEndpoint: 'https://api.openai.com/v1/chat/completions',
     maxTokens: 4096,
     temperature: 0.7,
-    topP: 0.9,
-    description: 'Most capable model for complex tasks'
+    description: 'Most capable model for complex reasoning and analysis'
   },
   {
     id: 'gpt-3.5-turbo',
     name: 'GPT-3.5 Turbo',
     provider: 'OpenAI',
+    apiEndpoint: 'https://api.openai.com/v1/chat/completions',
     maxTokens: 4096,
     temperature: 0.7,
-    topP: 0.9,
-    description: 'Fast and efficient for most tasks'
+    description: 'Fast and efficient for most conversational tasks'
   },
   {
     id: 'claude-3-opus',
     name: 'Claude 3 Opus',
     provider: 'Anthropic',
+    apiEndpoint: 'https://api.anthropic.com/v1/messages',
     maxTokens: 4096,
     temperature: 0.7,
-    topP: 0.9,
-    description: 'Excellent reasoning and analysis'
+    description: 'Excellent for detailed analysis and creative tasks'
   },
   {
-    id: 'gemini-pro',
-    name: 'Gemini Pro',
-    provider: 'Google',
+    id: 'claude-3-sonnet',
+    name: 'Claude 3 Sonnet',
+    provider: 'Anthropic',
+    apiEndpoint: 'https://api.anthropic.com/v1/messages',
     maxTokens: 4096,
     temperature: 0.7,
-    topP: 0.9,
-    description: 'Advanced multimodal capabilities'
+    description: 'Balanced performance for everyday AI tasks'
   }
 ]
 
@@ -79,22 +90,32 @@ export default function HomePage() {
   const [terminalHistory, setTerminalHistory] = useState<TerminalMessage[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showApiKeys, setShowApiKeys] = useState(false)
   
   // Voice state
   const [voiceState, setVoiceState] = useState<VoiceState>({
     isListening: false,
+    isRecording: false,
+    isProcessing: false,
     isSupported: false,
     transcript: '',
     confidence: 0
+  })
+
+  // API Keys (stored in localStorage)
+  const [apiKeys, setApiKeys] = useState<APIKeys>({
+    openai: '',
+    anthropic: '',
+    google: '',
+    whisper: ''
   })
 
   // MCP Settings
   const [mcpSettings, setMcpSettings] = useState({
     selectedModel: 'gpt-4-turbo',
     temperature: 0.7,
-    topP: 0.9,
     maxTokens: 2048,
-    systemPrompt: 'You are an AI assistant in a cyberpunk neural terminal. Be helpful and concise.'
+    systemPrompt: 'You are an advanced AI assistant in a cyberpunk neural terminal. Be helpful, concise, and maintain the futuristic atmosphere. You can discuss any topic and help with various tasks.'
   })
 
   const [systemStats, setSystemStats] = useState({
@@ -106,6 +127,8 @@ export default function HomePage() {
 
   const terminalRef = useRef<HTMLDivElement>(null)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
 
   const bootLines = [
     'NEURAL TERMINAL v2.1 INITIALIZING...',
@@ -113,17 +136,38 @@ export default function HomePage() {
     'Establishing neural pathways...',
     'Calibrating voice recognition...',
     'Connecting to AI networks...',
-    'Loading MCP (Model Control Protocol)...',
-    'AI models synchronized...',
+    'Loading Whisper transcription...',
+    'Initializing real-time LLM integration...',
+    'MCP (Model Control Protocol) ready...',
+    'API endpoints synchronized...',
     'Voice interface active...',
-    'System ready. Welcome back, user.',
+    'System ready. Neural pathways online.',
     '',
     'BOOT SEQUENCE COMPLETE'
   ]
 
-  // Initialize voice recognition
+  // Load API keys from localStorage on mount
+  useEffect(() => {
+    const savedKeys = localStorage.getItem('neural-terminal-api-keys')
+    if (savedKeys) {
+      try {
+        setApiKeys(JSON.parse(savedKeys))
+      } catch (error) {
+        console.error('Failed to load API keys:', error)
+      }
+    }
+  }, [])
+
+  // Save API keys to localStorage
+  const saveApiKeys = (keys: APIKeys) => {
+    setApiKeys(keys)
+    localStorage.setItem('neural-terminal-api-keys', JSON.stringify(keys))
+  }
+
+  // Initialize voice recognition and recording
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      // Check for speech recognition support
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
       if (SpeechRecognition) {
         setVoiceState(prev => ({ ...prev, isSupported: true }))
@@ -172,6 +216,11 @@ export default function HomePage() {
           setVoiceState(prev => ({ ...prev, isListening: false }))
         }
       }
+
+      // Check for media recording support
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        setVoiceState(prev => ({ ...prev, isSupported: true }))
+      }
     }
   }, [])
 
@@ -187,10 +236,11 @@ export default function HomePage() {
         setBootSequence(false)
         setTerminalHistory([
           { type: 'system', content: 'NEURAL TERMINAL v2.1 INITIALIZED', timestamp: new Date() },
-          { type: 'system', content: 'AI SYSTEMS: ONLINE', timestamp: new Date() },
-          { type: 'system', content: 'Voice Recognition: ACTIVE', timestamp: new Date() },
-          { type: 'system', content: 'MCP: Model Control Protocol Ready', timestamp: new Date() },
-          { type: 'system', content: 'Type "help" for available commands', timestamp: new Date() }
+          { type: 'system', content: 'Real-time LLM integration: ACTIVE', timestamp: new Date() },
+          { type: 'system', content: 'Whisper transcription: READY', timestamp: new Date() },
+          { type: 'system', content: 'Voice recognition: ENABLED', timestamp: new Date() },
+          { type: 'system', content: 'Type any message to chat with AI or use voice input', timestamp: new Date() },
+          { type: 'system', content: 'Commands: help, status, settings, clear', timestamp: new Date() }
         ])
       }, 1000)
     }
@@ -207,301 +257,339 @@ export default function HomePage() {
     return () => clearInterval(interval)
   }, [])
 
+  // Auto-scroll terminal
   useEffect(() => {
     if (terminalRef.current) {
       terminalRef.current.scrollTop = terminalRef.current.scrollHeight
     }
   }, [terminalHistory])
 
-  const startVoiceRecognition = () => {
-    if (recognitionRef.current && voiceState.isSupported) {
-      recognitionRef.current.start()
+  // Start audio recording for Whisper
+  const startAudioRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mediaRecorder = new MediaRecorder(stream)
+      mediaRecorderRef.current = mediaRecorder
+      audioChunksRef.current = []
+
+      mediaRecorder.ondataavailable = (event) => {
+        audioChunksRef.current.push(event.data)
+      }
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' })
+        setVoiceState(prev => ({ ...prev, audioBlob, isRecording: false, isProcessing: true }))
+        
+        // Send to Whisper for transcription
+        await transcribeWithWhisper(audioBlob)
+        
+        stream.getTracks().forEach(track => track.stop())
+      }
+
+      mediaRecorder.start()
+      setVoiceState(prev => ({ ...prev, isRecording: true }))
+    } catch (error) {
+      setVoiceState(prev => ({ 
+        ...prev, 
+        error: `Recording failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      }))
     }
   }
 
-  const stopVoiceRecognition = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop()
+  const stopAudioRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.stop()
     }
   }
 
-  // Fixed function to execute commands from buttons
+  // Transcribe audio with Whisper API
+  const transcribeWithWhisper = async (audioBlob: Blob) => {
+    if (!apiKeys.openai && !apiKeys.whisper) {
+      setVoiceState(prev => ({ 
+        ...prev, 
+        isProcessing: false,
+        error: 'OpenAI API key required for Whisper transcription' 
+      }))
+      return
+    }
+
+    try {
+      const formData = new FormData()
+      formData.append('file', audioBlob, 'audio.wav')
+      formData.append('model', 'whisper-1')
+
+      const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKeys.openai || apiKeys.whisper}`,
+        },
+        body: formData
+      })
+
+      if (!response.ok) {
+        throw new Error(`Whisper API error: ${response.status}`)
+      }
+
+      const result = await response.json()
+      const transcript = result.text
+
+      setVoiceState(prev => ({ 
+        ...prev, 
+        transcript,
+        isProcessing: false,
+        confidence: 0.95 // Whisper doesn't provide confidence, assume high
+      }))
+
+      setTerminalInput(transcript)
+
+      // Add whisper transcription to history
+      setTerminalHistory(prev => [...prev, {
+        type: 'whisper',
+        content: `[WHISPER] Transcribed: "${transcript}"`,
+        timestamp: new Date(),
+        metadata: { confidence: 0.95 }
+      }])
+
+    } catch (error) {
+      setVoiceState(prev => ({ 
+        ...prev, 
+        isProcessing: false,
+        error: `Whisper failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      }))
+    }
+  }
+
+  // Send message to selected LLM
+  const sendToLLM = async (message: string, isVoiceCommand = false) => {
+    const currentModel = AI_MODELS.find(m => m.id === mcpSettings.selectedModel)
+    if (!currentModel) {
+      throw new Error('No model selected')
+    }
+
+    // Check for API key
+    const apiKey = currentModel.provider === 'OpenAI' ? apiKeys.openai :
+                   currentModel.provider === 'Anthropic' ? apiKeys.anthropic :
+                   apiKeys.google
+
+    if (!apiKey) {
+      throw new Error(`${currentModel.provider} API key required`)
+    }
+
+    let requestBody: any
+    let headers: any = {
+      'Content-Type': 'application/json'
+    }
+
+    if (currentModel.provider === 'OpenAI') {
+      headers['Authorization'] = `Bearer ${apiKey}`
+      requestBody = {
+        model: currentModel.id,
+        messages: [
+          { role: 'system', content: mcpSettings.systemPrompt },
+          { role: 'user', content: message }
+        ],
+        max_tokens: mcpSettings.maxTokens,
+        temperature: mcpSettings.temperature
+      }
+    } else if (currentModel.provider === 'Anthropic') {
+      headers['x-api-key'] = apiKey
+      headers['anthropic-version'] = '2023-06-01'
+      requestBody = {
+        model: currentModel.id,
+        max_tokens: mcpSettings.maxTokens,
+        temperature: mcpSettings.temperature,
+        system: mcpSettings.systemPrompt,
+        messages: [{ role: 'user', content: message }]
+      }
+    }
+
+    const response = await fetch(currentModel.apiEndpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(requestBody)
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`${currentModel.provider} API error: ${response.status} - ${errorText}`)
+    }
+
+    const result = await response.json()
+
+    // Extract response based on provider
+    let content = ''
+    let tokens = 0
+
+    if (currentModel.provider === 'OpenAI') {
+      content = result.choices?.[0]?.message?.content || 'No response'
+      tokens = result.usage?.total_tokens || 0
+    } else if (currentModel.provider === 'Anthropic') {
+      content = result.content?.[0]?.text || 'No response'
+      tokens = result.usage?.input_tokens + result.usage?.output_tokens || 0
+    }
+
+    return { content, tokens }
+  }
+
   const executeCommand = async (command: string) => {
-    setTerminalInput(command)
+    const cmd = command.toLowerCase().trim()
     
-    // Simulate form submission
-    await new Promise(resolve => setTimeout(resolve, 100))
-    
-    setTerminalHistory(prev => [...prev, {
-      type: 'user',
-      content: `> ${command}`,
-      timestamp: new Date()
-    }])
-    
-    setTerminalInput('')
-    setIsProcessing(true)
+    // System commands
+    if (cmd === 'help') {
+      return {
+        type: 'system' as const,
+        content: `NEURAL TERMINAL v2.1 - Command Reference:
 
-    await new Promise(resolve => setTimeout(resolve, 500))
+CHAT COMMANDS:
+• Type any message to chat with the selected AI model
+• Use voice input with microphone for hands-free interaction
 
-    let response: TerminalMessage
+SYSTEM COMMANDS:
+• help - Show this command reference
+• status - Display detailed system status
+• clear - Clear terminal history
+• settings - Open/close MCP settings panel
+• apikeys - Open/close API key management
 
-    switch (command.toLowerCase()) {
-      case 'help':
-        response = {
-          type: 'system',
-          content: `Available Commands:
-• help - Show this help menu
-• status - Display system status  
-• clear - Clear terminal screen
-• mcp - Model Control Protocol settings
-• voice - Voice recognition status
-• models - List available AI models
-• ai <message> - Chat with AI using selected model
-• scan - Perform neural scan
-• neural optimize - Optimize neural networks`,
-          timestamp: new Date()
-        }
-        break
+VOICE COMMANDS:
+• Click microphone to record audio
+• Audio is transcribed via Whisper API
+• Transcription is sent to selected LLM
 
-      case 'mcp':
-        const currentModel = AI_MODELS.find(m => m.id === mcpSettings.selectedModel)
-        response = {
-          type: 'system',
-          content: `MCP (Model Control Protocol) Status:
-Current Model: ${currentModel?.name || 'Unknown'} (${currentModel?.provider})
-Temperature: ${mcpSettings.temperature}
-Top-P: ${mcpSettings.topP}
-Max Tokens: ${mcpSettings.maxTokens}
-System Prompt: ${mcpSettings.systemPrompt.substring(0, 80)}...
+Current Model: ${AI_MODELS.find(m => m.id === mcpSettings.selectedModel)?.name}
+Temperature: ${mcpSettings.temperature} (Creativity: ${Math.round(mcpSettings.temperature * 100)}%)`,
+        timestamp: new Date()
+      }
+    }
 
-Use settings panel to modify configuration.`,
-          timestamp: new Date()
-        }
-        break
-
-      case 'voice':
-        response = {
-          type: 'system',
-          content: `Voice Recognition Status:
-Supported: ${voiceState.isSupported ? 'YES' : 'NO'}
-Active: ${voiceState.isListening ? 'LISTENING' : 'STANDBY'}
-Last Confidence: ${Math.round(voiceState.confidence * 100)}%
-${voiceState.error ? `Error: ${voiceState.error}` : 'Status: OPERATIONAL'}`,
-          timestamp: new Date()
-        }
-        break
-
-      case 'status':
-        response = {
-          type: 'system',
-          content: `NEURAL TERMINAL SYSTEM STATUS
+    if (cmd === 'status') {
+      const hasOpenAI = !!apiKeys.openai
+      const hasAnthropic = !!apiKeys.anthropic
+      const currentModel = AI_MODELS.find(m => m.id === mcpSettings.selectedModel)
+      
+      return {
+        type: 'system' as const,
+        content: `NEURAL TERMINAL SYSTEM STATUS
 ╔═══════════════════════════════════════╗
 ║            SYSTEM OVERVIEW            ║
 ╠═══════════════════════════════════════╣
 ║ Status: ONLINE                        ║
-║ Neural Networks: ACTIVE               ║
-║ AI Systems: READY                     ║
+║ LLM Integration: ACTIVE               ║
+║ Whisper Transcription: ${hasOpenAI ? 'READY' : 'NO API KEY'}        ║
 ║ Voice Recognition: ${voiceState.isSupported ? 'ENABLED' : 'DISABLED'}           ║
 ║ MCP: OPERATIONAL                      ║
 ╚═══════════════════════════════════════╝
 
+SYSTEM RESOURCES:
 CPU Usage: ${systemStats.cpu}%
 Memory: ${systemStats.memory}%
 Network: ${systemStats.network}
-AI Status: ${systemStats.aiStatus}
-Current Model: ${AI_MODELS.find(m => m.id === mcpSettings.selectedModel)?.name}`,
-          timestamp: new Date()
-        }
-        break
 
-      case 'clear':
-        setTerminalHistory([])
-        setIsProcessing(false)
-        return
+AI CONFIGURATION:
+Current Model: ${currentModel?.name}
+Provider: ${currentModel?.provider}
+Temperature: ${mcpSettings.temperature}
+Max Tokens: ${mcpSettings.maxTokens}
 
-      case 'scan':
-        response = {
-          type: 'system',
-          content: `Neural network scan initiated...
-Scanning synapses: ████████████ 100%
-Active connections: 47,382,919
-Neural efficiency: 98.7%
-Voice pathways: ${voiceState.isSupported ? 'ACTIVE' : 'INACTIVE'}
-MCP channels: SYNCHRONIZED
-Scan complete.`,
-          timestamp: new Date()
-        }
-        break
+API KEYS STATUS:
+OpenAI: ${hasOpenAI ? '✅ CONFIGURED' : '❌ MISSING'}
+Anthropic: ${hasAnthropic ? '✅ CONFIGURED' : '❌ MISSING'}
 
-      default:
-        response = {
-          type: 'success',
-          content: `Command "${command}" executed successfully.`,
-          timestamp: new Date()
-        }
+VOICE FEATURES:
+Browser Support: ${voiceState.isSupported ? 'YES' : 'NO'}
+Last Confidence: ${Math.round(voiceState.confidence * 100)}%`,
+        timestamp: new Date()
+      }
     }
 
-    setTerminalHistory(prev => [...prev, response])
-    setIsProcessing(false)
+    if (cmd === 'clear') {
+      return null // Signal to clear
+    }
+
+    if (cmd === 'settings') {
+      setShowSettings(!showSettings)
+      return {
+        type: 'system' as const,
+        content: `Settings panel ${showSettings ? 'closed' : 'opened'}`,
+        timestamp: new Date()
+      }
+    }
+
+    if (cmd === 'apikeys') {
+      setShowApiKeys(!showApiKeys)
+      return {
+        type: 'system' as const,
+        content: `API key management ${showApiKeys ? 'closed' : 'opened'}`,
+        timestamp: new Date()
+      }
+    }
+
+    // If not a system command, send to LLM
+    try {
+      const { content, tokens } = await sendToLLM(command)
+      const currentModel = AI_MODELS.find(m => m.id === mcpSettings.selectedModel)
+      
+      return {
+        type: 'ai' as const,
+        content,
+        timestamp: new Date(),
+        metadata: {
+          model: currentModel?.name,
+          tokens
+        }
+      }
+    } catch (error) {
+      return {
+        type: 'error' as const,
+        content: `LLM Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date()
+      }
+    }
   }
 
   const handleCommand = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!terminalInput.trim() || isProcessing) return
 
-    const command = terminalInput.trim().toLowerCase()
     const isVoiceCommand = voiceState.transcript === terminalInput
 
     setTerminalHistory(prev => [...prev, {
       type: isVoiceCommand ? 'voice' : 'user',
-      content: `> ${terminalInput}`,
+      content: terminalInput,
       timestamp: new Date(),
       metadata: isVoiceCommand ? { confidence: voiceState.confidence } : undefined
     }])
+
+    const command = terminalInput
     setTerminalInput('')
     setVoiceState(prev => ({ ...prev, transcript: '' }))
     setIsProcessing(true)
 
-    await new Promise(resolve => setTimeout(resolve, 500))
-
-    let response: TerminalMessage
-
-    switch (command) {
-      case 'help':
-        response = {
-          type: 'system',
-          content: `Available Commands:
-• help - Show this help menu
-• status - Display system status  
-• clear - Clear terminal screen
-• mcp - Model Control Protocol settings
-• voice - Voice recognition status
-• models - List available AI models
-• ai <message> - Chat with AI using selected model
-• scan - Perform neural scan
-• neural optimize - Optimize neural networks`,
-          timestamp: new Date()
-        }
-        break
-
-      case 'mcp':
-        const currentModel = AI_MODELS.find(m => m.id === mcpSettings.selectedModel)
-        response = {
-          type: 'system',
-          content: `MCP (Model Control Protocol) Status:
-Current Model: ${currentModel?.name || 'Unknown'} (${currentModel?.provider})
-Temperature: ${mcpSettings.temperature}
-Top-P: ${mcpSettings.topP}
-Max Tokens: ${mcpSettings.maxTokens}
-System Prompt: ${mcpSettings.systemPrompt.substring(0, 80)}...
-
-Use settings panel to modify configuration.`,
-          timestamp: new Date()
-        }
-        break
-
-      case 'models':
-        response = {
-          type: 'system',
-          content: `Available AI Models:
-${AI_MODELS.map(model => 
-  `• ${model.name} (${model.provider}) - ${model.description}`
-).join('\n')}
-
-Current: ${AI_MODELS.find(m => m.id === mcpSettings.selectedModel)?.name}`,
-          timestamp: new Date()
-        }
-        break
-
-      case 'voice':
-        response = {
-          type: 'system',
-          content: `Voice Recognition Status:
-Supported: ${voiceState.isSupported ? 'YES' : 'NO'}
-Active: ${voiceState.isListening ? 'LISTENING' : 'STANDBY'}
-Last Confidence: ${Math.round(voiceState.confidence * 100)}%
-${voiceState.error ? `Error: ${voiceState.error}` : 'Status: OPERATIONAL'}`,
-          timestamp: new Date()
-        }
-        break
-
-      case 'status':
-        response = {
-          type: 'system',
-          content: `NEURAL TERMINAL SYSTEM STATUS
-╔═══════════════════════════════════════╗
-║            SYSTEM OVERVIEW            ║
-╠═══════════════════════════════════════╣
-║ Status: ONLINE                        ║
-║ Neural Networks: ACTIVE               ║
-║ AI Systems: READY                     ║
-║ Voice Recognition: ${voiceState.isSupported ? 'ENABLED' : 'DISABLED'}           ║
-║ MCP: OPERATIONAL                      ║
-╚═══════════════════════════════════════╝
-
-CPU Usage: ${systemStats.cpu}%
-Memory: ${systemStats.memory}%
-Network: ${systemStats.network}
-AI Status: ${systemStats.aiStatus}
-Current Model: ${AI_MODELS.find(m => m.id === mcpSettings.selectedModel)?.name}`,
-          timestamp: new Date()
-        }
-        break
-
-      case 'clear':
+    try {
+      const response = await executeCommand(command)
+      
+      if (response === null) {
+        // Clear command
         setTerminalHistory([])
-        setIsProcessing(false)
-        return
-
-      case 'scan':
-        response = {
-          type: 'system',
-          content: `Neural network scan initiated...
-Scanning synapses: ████████████ 100%
-Active connections: 47,382,919
-Neural efficiency: 98.7%
-Voice pathways: ${voiceState.isSupported ? 'ACTIVE' : 'INACTIVE'}
-MCP channels: SYNCHRONIZED
-Scan complete.`,
-          timestamp: new Date()
-        }
-        break
-
-      default:
-        if (command.startsWith('ai ')) {
-          const message = command.substring(3)
-          const currentModel = AI_MODELS.find(m => m.id === mcpSettings.selectedModel)
-          
-          response = {
-            type: 'ai',
-            content: `[${currentModel?.name}]: Processing "${message}"...
-Neural pathways activated through ${currentModel?.provider} network.
-Temperature: ${mcpSettings.temperature} | Accuracy: ${Math.round((1 - mcpSettings.temperature) * 100)}%
-
-Response: I'm processing your request about "${message}" using the ${currentModel?.name} model. This is a simulation of AI interaction with configurable parameters. How can I assist you further?`,
-            timestamp: new Date(),
-            metadata: {
-              model: currentModel?.name,
-              tokens: Math.floor(Math.random() * 100) + 50
-            }
-          }
-        } else {
-          response = {
-            type: 'error',
-            content: `Command not recognized: ${command}. Type 'help' for available commands.`,
-            timestamp: new Date()
-          }
-        }
+      } else {
+        setTerminalHistory(prev => [...prev, response])
+      }
+    } catch (error) {
+      setTerminalHistory(prev => [...prev, {
+        type: 'error',
+        content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date()
+      }])
+    } finally {
+      setIsProcessing(false)
     }
-
-    setTerminalHistory(prev => [...prev, response])
-    setIsProcessing(false)
   }
 
   const getMessageColor = (type: string) => {
     switch (type) {
       case 'user': return 'text-white'
       case 'voice': return 'text-purple-400'
+      case 'whisper': return 'text-blue-400'
       case 'system': return 'text-cyan-400'
       case 'ai': return 'text-green-400'
       case 'error': return 'text-red-400'
@@ -519,7 +607,7 @@ Response: I'm processing your request about "${message}" using the ${currentMode
               NEURAL TERMINAL
             </h1>
             <div className="text-xl text-green-400 animate-pulse">
-              v2.1 Advanced AI Interface
+              v2.1 AI Integration Active
             </div>
           </div>
 
@@ -547,7 +635,7 @@ Response: I'm processing your request about "${message}" using the ${currentMode
   }
 
   return (
-    <main className="h-screen w-screen p-4">
+    <main className="h-screen w-screen p-4 overflow-hidden">
       <div className="mb-4">
         <h1 className="text-4xl font-bold text-center animate-glow matrix-text">
           NEURAL TERMINAL v2.1
@@ -555,15 +643,15 @@ Response: I'm processing your request about "${message}" using the ${currentMode
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-120px)]">
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 flex flex-col min-h-0">
           <div className="neural-card h-full flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b border-cyan-400">
+            <div className="flex items-center justify-between p-4 border-b border-cyan-400 flex-shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-3 h-3 bg-red-500 rounded-full"></div>
                 <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
                 <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
                 <span className="text-cyan-400 font-mono text-sm ml-4">
-                  NEURAL TERMINAL v2.1 • MCP ENABLED
+                  NEURAL TERMINAL v2.1 • LLM ACTIVE
                 </span>
               </div>
               <div className="flex items-center gap-4">
@@ -576,85 +664,143 @@ Response: I'm processing your request about "${message}" using the ${currentMode
               </div>
             </div>
 
-            <div ref={terminalRef} className="flex-1 p-4 overflow-y-auto font-mono text-sm space-y-1">
+            <div 
+              ref={terminalRef} 
+              className="flex-1 p-4 overflow-y-auto font-mono text-sm space-y-1 scrollbar-thin scrollbar-thumb-cyan-400 scrollbar-track-gray-800"
+              style={{ maxHeight: 'calc(100vh - 300px)' }}
+            >
               {terminalHistory.map((message, index) => (
                 <div key={index} className={`${getMessageColor(message.type)} break-words`}>
+                  <span className="text-gray-500 text-xs">
+                    [{message.timestamp.toLocaleTimeString()}]
+                  </span>
                   {message.type === 'voice' && (
-                    <span className="text-purple-400 text-xs">[VOICE {Math.round((message.metadata?.confidence || 0) * 100)}%] </span>
+                    <span className="text-purple-400 text-xs ml-2">
+                      [VOICE {Math.round((message.metadata?.confidence || 0) * 100)}%]
+                    </span>
                   )}
-                  {message.content}
-                  {message.metadata?.model && (
-                    <span className="text-gray-500 text-xs ml-2">[{message.metadata.model}]</span>
+                  {message.type === 'whisper' && (
+                    <span className="text-blue-400 text-xs ml-2">
+                      [WHISPER]
+                    </span>
+                  )}
+                  {message.type === 'user' && (
+                    <span className="text-white ml-2">USER:</span>
+                  )}
+                  {message.type === 'ai' && (
+                    <span className="text-green-400 ml-2">
+                      [{message.metadata?.model || 'AI'}]:
+                    </span>
+                  )}
+                  <div className="ml-2 mt-1 whitespace-pre-wrap">
+                    {message.content}
+                  </div>
+                  {message.metadata?.tokens && (
+                    <span className="text-gray-500 text-xs ml-2">
+                      [{message.metadata.tokens} tokens]
+                    </span>
                   )}
                 </div>
               ))}
               {isProcessing && (
-                <div className="text-cyan-400 animate-pulse">
-                  Processing command with {AI_MODELS.find(m => m.id === mcpSettings.selectedModel)?.name}...
+                <div className="text-cyan-400 animate-pulse flex items-center gap-2">
+                  <Loader className="w-4 h-4 animate-spin" />
+                  Processing with {AI_MODELS.find(m => m.id === mcpSettings.selectedModel)?.name}...
+                </div>
+              )}
+              {voiceState.isProcessing && (
+                <div className="text-blue-400 animate-pulse flex items-center gap-2">
+                  <Loader className="w-4 h-4 animate-spin" />
+                  Transcribing audio with Whisper...
                 </div>
               )}
             </div>
 
-            <div className="border-t border-cyan-400 p-4">
+            <div className="border-t border-cyan-400 p-4 flex-shrink-0">
               <form onSubmit={handleCommand} className="flex items-center gap-2">
-                <span className="text-cyan-400">➜</span>
-                <span className="text-green-400">neural</span>
-                <span className="text-gray-400">$</span>
+                <div className="flex items-center gap-1 text-xs">
+                  <span className="text-cyan-400">➜</span>
+                  <span className="text-green-400">neural</span>
+                  <span className="text-gray-400">$</span>
+                </div>
                 <input
                   type="text"
                   value={terminalInput}
                   onChange={(e) => setTerminalInput(e.target.value)}
                   className="flex-1 bg-transparent text-white outline-none font-mono ml-2"
-                  placeholder="Enter command or use voice..."
+                  placeholder="Chat with AI or enter command..."
                   disabled={isProcessing}
                   autoFocus
                 />
                 
-                {/* Voice button */}
+                {/* Voice buttons */}
                 {voiceState.isSupported && (
-                  <button
-                    type="button"
-                    onClick={voiceState.isListening ? stopVoiceRecognition : startVoiceRecognition}
-                    className={`p-2 rounded-md transition-all duration-200 ${
-                      voiceState.isListening
-                        ? 'bg-purple-500 text-white animate-pulse'
-                        : 'bg-gray-800 text-cyan-400 hover:bg-gray-700'
-                    }`}
-                    title={voiceState.isListening ? 'Stop listening' : 'Start voice input'}
-                  >
-                    {voiceState.isListening ? (
-                      <MicOff className="w-4 h-4" />
-                    ) : (
-                      <Mic className="w-4 h-4" />
-                    )}
-                  </button>
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={voiceState.isRecording ? stopAudioRecording : startAudioRecording}
+                      className={`p-2 rounded-md transition-all duration-200 text-xs ${
+                        voiceState.isRecording
+                          ? 'bg-red-500 text-white animate-pulse'
+                          : 'bg-gray-800 text-orange-400 hover:bg-gray-700'
+                      }`}
+                      title={voiceState.isRecording ? 'Stop recording (Whisper)' : 'Record audio (Whisper)'}
+                      disabled={voiceState.isProcessing}
+                    >
+                      {voiceState.isRecording ? (
+                        <MicOff className="w-4 h-4" />
+                      ) : (
+                        <Mic className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
                 )}
 
-                {!isProcessing && (
-                  <span className="terminal-cursor inline-block"></span>
-                )}
+                <button
+                  type="submit"
+                  disabled={!terminalInput.trim() || isProcessing}
+                  className="p-2 rounded-md bg-cyan-400 text-black hover:bg-cyan-300 transition-colors disabled:opacity-50"
+                  title="Send message"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
               </form>
               
-              {voiceState.isListening && (
-                <div className="mt-2 text-xs text-purple-400 animate-pulse">
-                  🎤 Listening... Speak your command
+              {voiceState.isRecording && (
+                <div className="mt-2 text-xs text-red-400 animate-pulse">
+                  🎙️ Recording audio for Whisper transcription...
+                </div>
+              )}
+              
+              {voiceState.error && (
+                <div className="mt-2 text-xs text-red-400">
+                  ⚠️ {voiceState.error}
                 </div>
               )}
             </div>
           </div>
         </div>
 
-        <div className="lg:col-span-1 space-y-4">
+        <div className="lg:col-span-1 space-y-4 overflow-y-auto max-h-full">
           <div className="neural-card">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-cyan-400 text-lg font-bold animate-glow">SYSTEM MONITOR</h3>
-              <button
-                onClick={() => setShowSettings(!showSettings)}
-                className="p-2 rounded hover:bg-gray-800 transition-colors group"
-                title="MCP Settings"
-              >
-                <Settings className={`w-4 h-4 text-cyan-400 transition-transform duration-200 ${showSettings ? 'rotate-45' : 'group-hover:rotate-12'}`} />
-              </button>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setShowApiKeys(!showApiKeys)}
+                  className="p-1 rounded hover:bg-gray-800 transition-colors"
+                  title="API Keys"
+                >
+                  <Key className="w-4 h-4 text-yellow-400" />
+                </button>
+                <button
+                  onClick={() => setShowSettings(!showSettings)}
+                  className="p-1 rounded hover:bg-gray-800 transition-colors"
+                  title="MCP Settings"
+                >
+                  <Settings className={`w-4 h-4 text-cyan-400 transition-transform duration-200 ${showSettings ? 'rotate-45' : ''}`} />
+                </button>
+              </div>
             </div>
             
             <div className="space-y-4 text-sm">
@@ -685,20 +831,68 @@ Response: I'm processing your request about "${message}" using the ${currentMode
               </div>
               
               <div className="flex justify-between">
-                <span className="text-gray-400">Network:</span>
-                <span className="text-green-400 animate-pulse">● {systemStats.network}</span>
+                <span className="text-gray-400">LLM:</span>
+                <span className="text-green-400 animate-pulse">● ACTIVE</span>
               </div>
               
               <div className="flex justify-between">
-                <span className="text-gray-400">Voice:</span>
-                <span className={`animate-pulse ${voiceState.isSupported ? 'text-green-400' : 'text-red-400'}`}>
-                  ● {voiceState.isSupported ? 'READY' : 'OFFLINE'}
+                <span className="text-gray-400">Whisper:</span>
+                <span className={`animate-pulse ${apiKeys.openai ? 'text-green-400' : 'text-red-400'}`}>
+                  ● {apiKeys.openai ? 'READY' : 'NO KEY'}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* MCP Settings Panel - Now properly shows/hides */}
+          {/* API Keys Panel */}
+          {showApiKeys && (
+            <div className="neural-card border-2 border-yellow-400 shadow-lg shadow-yellow-400/20">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-yellow-400 text-lg font-bold flex items-center gap-2">
+                  <Key className="w-5 h-5" />
+                  API KEYS
+                </h3>
+                <button
+                  onClick={() => setShowApiKeys(false)}
+                  className="text-gray-400 hover:text-yellow-400 transition-colors"
+                >
+                  <ChevronUp className="w-4 h-4" />
+                </button>
+              </div>
+              
+              <div className="space-y-3 text-sm">
+                <div>
+                  <label className="block text-gray-400 mb-1 font-semibold">OpenAI API Key:</label>
+                  <input
+                    type="password"
+                    value={apiKeys.openai}
+                    onChange={(e) => saveApiKeys({ ...apiKeys, openai: e.target.value })}
+                    placeholder="sk-..."
+                    className="w-full bg-gray-800 border border-yellow-400 rounded px-2 py-1 text-yellow-400 text-xs"
+                  />
+                  <div className="text-xs text-gray-500 mt-1">
+                    Used for GPT models and Whisper transcription
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-gray-400 mb-1 font-semibold">Anthropic API Key:</label>
+                  <input
+                    type="password"
+                    value={apiKeys.anthropic}
+                    onChange={(e) => saveApiKeys({ ...apiKeys, anthropic: e.target.value })}
+                    placeholder="sk-ant-..."
+                    className="w-full bg-gray-800 border border-yellow-400 rounded px-2 py-1 text-yellow-400 text-xs"
+                  />
+                  <div className="text-xs text-gray-500 mt-1">
+                    Used for Claude models
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* MCP Settings Panel */}
           {showSettings && (
             <div className="neural-card border-2 border-cyan-400 shadow-lg shadow-cyan-400/20">
               <div className="flex items-center justify-between mb-4">
@@ -720,10 +914,10 @@ Response: I'm processing your request about "${message}" using the ${currentMode
                   <select
                     value={mcpSettings.selectedModel}
                     onChange={(e) => setMcpSettings(prev => ({ ...prev, selectedModel: e.target.value }))}
-                    className="w-full bg-gray-800 border border-cyan-400 rounded px-3 py-2 text-cyan-400 text-sm focus:border-cyan-300 focus:outline-none"
+                    className="w-full bg-gray-800 border border-cyan-400 rounded px-3 py-2 text-cyan-400 text-sm"
                   >
                     {AI_MODELS.map(model => (
-                      <option key={model.id} value={model.id} className="bg-gray-800 text-cyan-400">
+                      <option key={model.id} value={model.id} className="bg-gray-800">
                         {model.name} ({model.provider})
                       </option>
                     ))}
@@ -737,7 +931,7 @@ Response: I'm processing your request about "${message}" using the ${currentMode
                   <label className="block text-gray-400 mb-2 font-semibold">
                     Temperature: {mcpSettings.temperature} 
                     <span className="text-cyan-400 ml-2">
-                      (Accuracy: {Math.round((1 - mcpSettings.temperature) * 100)}%)
+                      (Creativity: {Math.round(mcpSettings.temperature * 100)}%)
                     </span>
                   </label>
                   <input
@@ -747,7 +941,7 @@ Response: I'm processing your request about "${message}" using the ${currentMode
                     step="0.1"
                     value={mcpSettings.temperature}
                     onChange={(e) => setMcpSettings(prev => ({ ...prev, temperature: parseFloat(e.target.value) }))}
-                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider-cyan"
+                    className="w-full"
                   />
                   <div className="flex justify-between text-xs text-gray-500 mt-1">
                     <span>Precise</span>
@@ -766,21 +960,18 @@ Response: I'm processing your request about "${message}" using the ${currentMode
                     step="256"
                     value={mcpSettings.maxTokens}
                     onChange={(e) => setMcpSettings(prev => ({ ...prev, maxTokens: parseInt(e.target.value) }))}
-                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider-cyan"
+                    className="w-full"
                   />
-                  <div className="flex justify-between text-xs text-gray-500 mt-1">
-                    <span>256</span>
-                    <span>4096</span>
-                  </div>
                 </div>
 
-                <div className="pt-2 border-t border-gray-600">
-                  <button
-                    onClick={() => executeCommand('mcp')}
-                    className="w-full neural-button text-xs py-2"
-                  >
-                    VIEW MCP STATUS
-                  </button>
+                <div>
+                  <label className="block text-gray-400 mb-2 font-semibold">System Prompt:</label>
+                  <textarea
+                    value={mcpSettings.systemPrompt}
+                    onChange={(e) => setMcpSettings(prev => ({ ...prev, systemPrompt: e.target.value }))}
+                    className="w-full bg-gray-800 border border-cyan-400 rounded px-2 py-1 text-cyan-400 text-xs"
+                    rows={3}
+                  />
                 </div>
               </div>
             </div>
@@ -788,44 +979,34 @@ Response: I'm processing your request about "${message}" using the ${currentMode
 
           <div className="neural-card">
             <h3 className="text-cyan-400 text-lg font-bold mb-4 animate-glow">QUICK ACCESS</h3>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2">
               {[
                 { cmd: 'help', label: 'HELP' },
-                { cmd: 'mcp', label: 'MCP' },
-                { cmd: 'voice', label: 'VOICE' },
-                { cmd: 'status', label: 'STATUS' }
+                { cmd: 'status', label: 'STATUS' },
+                { cmd: 'settings', label: 'SETTINGS' },
+                { cmd: 'clear', label: 'CLEAR' }
               ].map(({ cmd, label }) => (
                 <button 
                   key={cmd}
-                  onClick={() => executeCommand(cmd)}
-                  className="neural-button text-xs py-2 uppercase hover:bg-cyan-400 hover:text-black transition-all duration-200"
+                  onClick={() => {
+                    setTerminalInput(cmd)
+                    setTimeout(() => {
+                      const form = document.querySelector('form')
+                      if (form) {
+                        form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }))
+                      }
+                    }, 100)
+                  }}
+                  className="neural-button text-xs py-2 uppercase"
                   disabled={isProcessing}
                 >
                   {label}
                 </button>
               ))}
             </div>
-            
-            <div className="mt-3 pt-3 border-t border-gray-600">
-              <button
-                onClick={() => executeCommand('clear')}
-                className="w-full neural-button text-xs py-2 border-red-400 text-red-400 hover:bg-red-400 hover:text-black"
-                disabled={isProcessing}
-              >
-                CLEAR TERMINAL
-              </button>
-            </div>
           </div>
         </div>
       </div>
     </main>
   )
-}
-
-// Declare global SpeechRecognition types
-declare global {
-  interface Window {
-    SpeechRecognition: typeof SpeechRecognition
-    webkitSpeechRecognition: typeof SpeechRecognition
-  }
 }
